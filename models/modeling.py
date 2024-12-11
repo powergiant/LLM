@@ -201,7 +201,7 @@ class Qwen2Attention(nn.Module):
         self,
         hidden_states: Tensor,
         position_embeddings: Tuple[Tensor, Tensor],
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor,
     ) -> Tensor:
         bsz, q_len, _ = hidden_states.size()
 
@@ -277,7 +277,7 @@ class Qwen2DecoderLayer(nn.Module):
     def forward(
         self,
         hidden_states: Tensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor,
         position_embeddings: Optional[Tuple[Tensor, Tensor]] = None,  # will become mandatory in v4.46
     ) -> Tensor:
         """
@@ -377,8 +377,8 @@ class Qwen2Model(nn.Module):
     def forward(
         self,
         input_ids: torch.LongTensor,
-        position_ids: torch.LongTensor,
-        attention_mask: Optional[Tensor] = None,
+        attention_mask: Tensor,
+        position_ids: torch.LongTensor
     ) -> Tensor:
         inputs_embeds = self.embed_tokens(input_ids)
 
@@ -490,16 +490,16 @@ class Qwen2ForCausalLM(Qwen2Model):
     def forward(
         self,
         input_ids: torch.LongTensor,
+        attention_mask: Tensor,
         position_ids: torch.LongTensor,
-        attention_mask: Optional[torch.Tensor] = None,
         num_logits_to_keep: int = 0,
     ) -> Tensor:
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         hidden_states = self.model.forward(
             input_ids=input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask
+            attention_mask=attention_mask,
+            position_ids=position_ids
         )
 
         logits = self.lm_head(hidden_states[:, -num_logits_to_keep:, :])
@@ -521,9 +521,6 @@ def _test():
     print("\n"*2)
     print('='*30 + 'test_old_qwen_modeling' + '='*30)
     
-    # torch.manual_seed(42)
-    # conf_old = AutoConfig.from_pretrained("Qwen/Qwen2.5-1.5B", attn_implementation = "eager")
-    # model_old: Qwen2ForCausalLMOld = AutoModelForCausalLM.from_config(conf_old)
     model_old: Qwen2ForCausalLMOld = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-1.5B", attn_implementation = "eager")
 
     logits_old = model_old.forward(input_ids, attention_mask, position_ids).logits
@@ -546,11 +543,10 @@ def _test():
                        rope_theta=1000000.0,
                        attention_dropout=0.0
                        )
-    # torch.manual_seed(42)
     model = Qwen2ForCausalLM(conf)
     model.sync_from_pretrained_model(model_old)
 
-    logits = model.forward(input_ids, position_ids, attention_mask)
+    logits = model.forward(input_ids, attention_mask, position_ids)
 
     print(logits.shape)
 
