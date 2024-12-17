@@ -201,7 +201,7 @@ def _test_dataset_chuncked(data_dir: str):
 
 if __name__ == '__main__':
     import os 
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_downloaded/step2_processed/_test/sky")
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_downloaded/_test/step2_processed/sky")
     _test_files(data_dir)
     _test_dataset_untokenized(data_dir)
     _test_dataset_chuncked(data_dir)
