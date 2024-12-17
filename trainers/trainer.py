@@ -34,8 +34,8 @@ class QwenTrainConfig:
     global_batch_size: int = field(init=False) 
 
     def __post_init__(self):
-        self.global_batch_size = self.batch_size_par_device*self.num_devices
         self.batch_size_par_device = self.gradient_accumulation_steps*self.micro_batch_size
+        self.global_batch_size = self.batch_size_par_device*self.num_devices
 
 # @dataclass
 # class QwenTrainState:
@@ -66,8 +66,8 @@ class QwenTrainer:
         self.grad_clip = conf.grad_clip
         self.iter_start = conf.iter_start
         self.iter_max = conf.iter_max
-        self.iter_warmup: int
-        self.iter_lr_decay: int
+        self.iter_warmup = conf.iter_warmup
+        self.iter_lr_decay = conf.iter_lr_decay
         self.checkpoint_path = conf.checkpoint_path
         self.micro_batch_size = conf.micro_batch_size
         self.gradient_accumulation_steps = conf.gradient_accumulation_steps
@@ -164,3 +164,55 @@ class QwenTrainer:
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
         return self.lr_min + coeff*(self.lr_max - self.lr_min)
 
+def _test_trainer():
+    from data.dataloader import ChunkedDatasetConfig
+    import os
+
+    # Prepare dataloader
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_downloaded/_test/step2_processed/sky")
+    conf_dataset = ChunkedDatasetConfig(data_dir=data_dir,
+                                        is_shuffle=False,
+                                        l_ctx=2048,
+                                        tokenizer=tokenizer,
+                                        num_worker=2,
+                                        buffer_size=100)
+    dataset = ChunkedDataset(conf=conf_dataset)
+
+    # Prepare model
+    from transformers import AutoModelForCausalLM
+    from transformers import Qwen2ForCausalLM as Qwen2ForCausalLMOld
+    from models.modeling_qwen import Qwen2Config
+
+    model_old: Qwen2ForCausalLMOld = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-1.5B", attn_implementation = "eager")
+    conf = Qwen2Config(hidden_size=1536,
+                       pad_token_id=None,
+                       vocab_size=151936,
+                       num_hidden_layers=28,
+                       rms_norm_eps=1e-06,
+                       intermediate_size=8960,
+                       hidden_act="silu",
+                       num_attention_heads=12,
+                       num_key_value_heads=2,
+                       max_position_embeddings=131072,
+                       rope_theta=1000000.0,
+                       attention_dropout=0.0
+                       )
+    model = Qwen2ForCausalLM(conf)
+    model.sync_from_pretrained_model(model_old)
+
+    # Prepare config
+    conf = QwenTrainConfig()
+
+    # Prepare trainer
+    trainer = QwenTrainer(conf, model, dataset)
+
+    # train
+    trainer.train()
+
+
+if __name__ == '__main__':
+    from transformers import AutoTokenizer
+    # Prepare tokenizer
+    tokenizer_name = "Qwen/Qwen2.5-1.5B"
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True, pad_token='<|endoftext|>')
+    _test_trainer()

@@ -25,9 +25,9 @@ class UnTokenizedDataset:
         self.shuffle_buffer_size = conf.shuffle_buffer_size
         self.random_seed = conf.random_seed
 
-        if data_dir.endswith('/'):
+        if self.data_dir.endswith('/'):
             raise "The data_dir cannot end with '/'!"
-        list_files = glob.glob(f"{data_dir}/**/*.jsonl", recursive=True)
+        list_files = glob.glob(f"{self.data_dir}/**/*.jsonl", recursive=True)
         
         self._dataset_raw = (load_dataset("json", data_files=list_files, streaming=True))['train']
         if self.is_shuffle:
