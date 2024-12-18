@@ -364,10 +364,10 @@ class Qwen2Model(nn.Module):
 
     def __init__(self, config: Qwen2Config):
         super().__init__()
-        self.padding_idx = config.pad_token_id
+        self.pad_token_id = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.pad_token_id)
         self.layers = nn.ModuleList(
             [Qwen2DecoderLayer(config.to_decoder_conf(), layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )

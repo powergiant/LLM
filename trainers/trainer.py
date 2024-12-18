@@ -11,6 +11,7 @@ from data.dataloader import ChunkedDataLoader, ChunkedDataset
 from models.modeling_qwen import Qwen2ForCausalLM, Qwen2DecoderLayer
 from typing import Optional, Literal
 import math
+from utils.utils import generate_att_mask_pos_ids
 
 
 @dataclass
@@ -111,12 +112,12 @@ class QwenTrainer:
 
         fabric.seed_everything(3407)
 
-        model = fabric.setup_module(self.model)
+        model: Qwen2ForCausalLM = fabric.setup_module(self.model)
     
         optim: torch.optim.Optimizer = fabric.setup_optimizers(self.optim)
 
         dataloader = ChunkedDataLoader(self.dataset, self.micro_batch_size, batch_start=self.iter_start)
-        dataloader = fabric.setup_dataloaders(dataloader)
+        dataloader: ChunkedDataLoader = fabric.setup_dataloaders(dataloader)
 
         # state = {"model": model,"optimizer": optimizer, "hparams": hparams, "iter_num": 0, "step_count": 0}
         
@@ -132,10 +133,12 @@ class QwenTrainer:
             input_ids = data[:, 0:data.shape[1] - 1]
             target_ids = data[:, 1:data.shape[1]]
 
+            attention_mask, position_ids = generate_att_mask_pos_ids(input_ids, self.dataset.tokenizer.pad_token_id)
+
             is_accumulating = (self.iter_current + 1)%self.gradient_accumulation_steps == 0
             # todo: autocast
             with fabric.no_backward_sync(model, enabled=is_accumulating):
-                output_logits = model.forward(input_ids)
+                output_logits = model.forward(input_ids, attention_mask, position_ids)
                 with fabric.autocast():
                     loss = torch.nn.functional.cross_entropy(output_logits, target_ids)
                 fabric.backward(loss/self.gradient_accumulation_steps)
