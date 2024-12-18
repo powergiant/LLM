@@ -506,6 +506,31 @@ class Qwen2ForCausalLM(Qwen2Model):
 
         return logits
 
+class QwenCrossEntropyLoss(nn.Module):
+    def __init__(
+        self,
+        ignore_index=151643,
+    ):
+        """
+        Arguments:
+            ignore_index: int. If labels == ignore_index, the loss is set to 0.0.
+        """
+        super().__init__()
+        self.ignore_index = ignore_index
+
+    def forward(self, input: Tensor, target: Tensor):
+        if len(input.shape) == 3:
+            input = input.reshape(-1, input.size(-1))
+            target = target.reshape(-1)
+        loss = torch.nn.functional.cross_entropy(
+            input,
+            target,
+            ignore_index=self.ignore_index,
+        )
+        loss = loss.sum() / (target != self.ignore_index).sum()
+
+        return loss
+
 def _test():
     from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
     from transformers import Qwen2ForCausalLM as Qwen2ForCausalLMOld
@@ -554,6 +579,12 @@ def _test():
     print("\n"*2)
     print('='*30 + 'test_my_modeling_equals_to_old' + '='*30)
     assert torch.equal(logits, logits_old)
+
+    print("\n"*2)
+    print('='*30 + 'test_my_cross_entropy_loss' + '='*30)
+    input = torch.randn(8, 10, 15, requires_grad=True)
+    target = torch.randint(15, (8, 10), dtype=torch.int64)
+    print(QwenCrossEntropyLoss()(input, target))
 
 if __name__ == '__main__':
     _test()

@@ -8,7 +8,7 @@ import lightning as L
 from lightning.fabric.strategies import FSDPStrategy, SingleDeviceStrategy
 from dataclasses import dataclass, field
 from data.dataloader import ChunkedDataLoader, ChunkedDataset
-from models.modeling_qwen import Qwen2ForCausalLM, Qwen2DecoderLayer
+from models.modeling_qwen import Qwen2ForCausalLM, Qwen2DecoderLayer, QwenCrossEntropyLoss
 from typing import Optional, Literal
 import math
 from utils.utils import generate_att_mask_pos_ids
@@ -136,11 +136,14 @@ class QwenTrainer:
             attention_mask, position_ids = generate_att_mask_pos_ids(input_ids, self.dataset.tokenizer.pad_token_id)
 
             is_accumulating = (self.iter_current + 1)%self.gradient_accumulation_steps == 0
+
+            cross_entropy = QwenCrossEntropyLoss(ignore_index=self.dataset.tokenizer.pad_token_id)
+
             # todo: autocast
             with fabric.no_backward_sync(model, enabled=is_accumulating):
                 output_logits = model.forward(input_ids, attention_mask, position_ids)
                 with fabric.autocast():
-                    loss = torch.nn.functional.cross_entropy(output_logits, target_ids)
+                    loss = cross_entropy(output_logits, target_ids)
                 fabric.backward(loss/self.gradient_accumulation_steps)
 
             if not is_accumulating:
@@ -175,7 +178,7 @@ def _test_trainer():
     data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_downloaded/_test/step2_processed/sky")
     conf_dataset = ChunkedDatasetConfig(data_dir=data_dir,
                                         is_shuffle=False,
-                                        l_ctx=2048,
+                                        l_ctx=10,
                                         tokenizer=tokenizer,
                                         num_worker=2,
                                         buffer_size=100)
