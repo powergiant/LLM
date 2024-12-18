@@ -178,7 +178,7 @@ def _test_trainer():
     data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_downloaded/_test/step2_processed/sky")
     conf_dataset = ChunkedDatasetConfig(data_dir=data_dir,
                                         is_shuffle=False,
-                                        l_ctx=10,
+                                        l_ctx=2048,
                                         tokenizer=tokenizer,
                                         num_worker=2,
                                         buffer_size=100)
