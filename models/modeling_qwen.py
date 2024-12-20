@@ -476,9 +476,12 @@ def _prepare_4d_causal_attention_mask_with_cache_position(
 
     return causal_mask
 
-class Qwen2ForCausalLM(Qwen2Model):
+# class Qwen2ForCausalLM(Qwen2Model):
+#     def __init__(self, config: Qwen2Config):
+#         super().__init__(config)
+class Qwen2ForCausalLM(nn.Module):
     def __init__(self, config: Qwen2Config):
-        super().__init__(config)
+        super().__init__()
         self.model = Qwen2Model(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
