@@ -34,7 +34,7 @@ class UnTokenizedDataset:
             self._dataset_raw = self._dataset_raw.shuffle(seed=conf.random_seed, buffer_size=self.shuffle_buffer_size)
         
         self.iter = iter(self._dataset_raw)
-
+    
     def take(self, n: int):
         list_sentence_dict = list(self._dataset_raw.take(n))
         list_sentence = list(map(lambda x: x["text"], list_sentence_dict))
@@ -60,7 +60,9 @@ class ChunkedDatasetConfig:
 
 
 class ChunkedDataset(IterableDataset):
-    def __init__(self, conf: ChunkedDatasetConfig):
+    def __init__(self, conf: ChunkedDatasetConfig, 
+                 global_parallel_rank: int = 0, 
+                 num_devices: int = 1):
         self.data_dir = conf.data_dir
         self.is_shuffle = conf.is_shuffle
         self.shuffle_buffer_size = conf.shuffle_buffer_size
@@ -72,9 +74,18 @@ class ChunkedDataset(IterableDataset):
 
         conf_untokenized = _config_transfer(conf)
         self._data_set_untokenized = UnTokenizedDataset(conf_untokenized)
-        
+        self.iter = iter(self._data_set_untokenized)
+
         self.buffer_sentence = []
         self.buffer = []
+
+        check_is_rank_devices_legal(global_parallel_rank,
+                                    num_devices, 
+                                    conf.buffer_size)
+        self.global_parallel_rank = global_parallel_rank
+        self.num_devices = num_devices
+        
+
     
     def __next__(self):
         
@@ -82,7 +93,7 @@ class ChunkedDataset(IterableDataset):
         if self.buffer == []:
             self.sentence_buffer = []
             for _ in range(self.buffer_size):
-                self.sentence_buffer.append(next(self._data_set_untokenized)) 
+                self.sentence_buffer.append(next(self.iter)) 
             with Pool(processes=self.num_worker) as pool:
                 tokenize_and_chunk_partial: function = \
                     partial(tokenize_and_chunk, 
@@ -92,11 +103,24 @@ class ChunkedDataset(IterableDataset):
             for chunks in buffer:
                 for chunk in chunks:
                     self.buffer.append(chunk)
-
-        return self.buffer.pop(0)
+        
+        next_chunk = self.buffer[self.global_parallel_rank]
+        self.buffer = self.buffer[self.num_devices:]
+        return next_chunk
+    
 
     def __iter__(self):
+        self.buffer = []
+        self.iter = iter(self._data_set_untokenized)
         return self
+
+def check_is_rank_devices_legal(global_parallel_rank: int,
+                                num_devices: int,
+                                buffer_size: int):
+    if buffer_size%num_devices != 0:
+        raise f"buffer_size must be divisible by num_devices"
+    if global_parallel_rank >= num_devices:
+        raise f"global_parallel_rank must be less than num_devices"
 
 def tokenize_and_chunk(text: str, tokenizer: PreTrainedTokenizer, l_ctx: int):
     tokenized: torch.Tensor = tokenizer(text, return_tensors="pt", truncation=False, add_special_tokens=False)
@@ -119,10 +143,17 @@ def _config_transfer(conf: ChunkedDatasetConfig) -> UnTokenizedDatasetConfig:
                                 shuffle_buffer_size=conf.shuffle_buffer_size)
 
 class ChunkedDataLoader(DataLoader):
-    def __init__(self, dataset: ChunkedDataset, batch_size: int = 1, batch_start: int = 0):
+    def __init__(self, dataset: ChunkedDataset, 
+                 batch_size: int = 1, 
+                 batch_start: int = 0):
+        
         self.batch_size = batch_size
         self.batch_start = batch_start
-        super().__init__(dataset, batch_size)
+        self.global_parallel_rank = dataset.global_parallel_rank
+        self.num_devices = dataset.num_devices
+        if batch_size % dataset.num_devices != 0:
+              raise f"batch_size must be divisible by num_devices!"
+        super().__init__(dataset, batch_size//dataset.num_devices)
         # self._dataloader = DataLoader(dataset, batch_size)
 
     def __iter__(self):
@@ -154,10 +185,16 @@ def _test_dataset_untokenized(data_dir: str):
     print("")
     print("1. test of iteration")
     for i, data in enumerate(dataset):
-        if i > 1:
-            break
         print(data)
         print("")
+        if i > -1:
+            break
+
+    for i, data in enumerate(dataset):
+        print(data)
+        print("")
+        if i > -1:
+            break
 
     print("2. test of take function")
     for i in range(2):
@@ -183,18 +220,53 @@ def _test_dataset_chuncked(data_dir: str):
     print("")
     print("1. test of chuncked dataset")
     for i, data in enumerate(dataset):
-        if i > 50:
-            break
         print(tokenizer.decode(data[:-1]))
         print("")
+        if i > 0:
+            break
 
-    # print("2. test of dataloader")
-    # dataloader = ChunkedDataLoader(dataset, batch_start=1)
-    # for i, data in enumerate(dataloader):
-    #     if i > 5:
-    #         break
-    #     print(tokenizer.decode(data[0][:-1]))
-    #     print("")
+    for i, data in enumerate(dataset):
+        print(tokenizer.decode(data[:-1]))
+        print("")
+        if i > 0:
+            break
+
+    print("2. test of dataloader")
+    dataloader = ChunkedDataLoader(dataset, batch_start=1)
+    for i, data in enumerate(dataloader):
+        print(tokenizer.decode(data[0][:-1]))
+        print("")
+        if i > 5:
+            break
+    print("\n"*2)
+
+    # print("3. test of dataloader -- multiple epoch")
+    # dataloader = ChunkedDataLoader(dataset, batch_start=0)
+    # for _ in range(5):
+    #     for i, data in enumerate(dataloader):
+    #         if i == 0:
+    #             print(tokenizer.decode(data[0][:-1]))
+    #             print("")
+    #         # if i > -1:
+    #         #     break
+    #     print("Finish an epoch!")
+    # print("\n"*2)
+
+    print("4. test of distributed dataloader")
+    dataloader = ChunkedDataLoader(dataset, 
+                                   batch_start=0)
+    for i, data in enumerate(dataloader):
+        print(i, tokenizer.decode(data[0][:-1]))
+        print("")
+        if i > 13:
+            break
+    print("\n"*2)
+    dataloader = ChunkedDataLoader(dataset, batch_size=2, batch_start=0)
+    for i, data in enumerate(dataloader):
+        print(i, tokenizer.decode(data[0][:-1]))
+        print("")
+        if i > 5:
+            break
     print("\n"*2)
 
     
