@@ -154,11 +154,7 @@ class ChunkedDataLoader(DataLoader):
         
         self.batch_size = batch_size
         self.batch_start = batch_start
-        self.global_parallel_rank = dataset.global_parallel_rank
-        self.num_devices = dataset.num_devices
-        if batch_size % dataset.num_devices != 0:
-              raise f"batch_size must be divisible by num_devices!"
-        super().__init__(dataset, batch_size//dataset.num_devices)
+        super().__init__(dataset, batch_size)
         # self._dataloader = DataLoader(dataset, batch_size)
 
     def __iter__(self):
@@ -266,7 +262,8 @@ def _test_dataset_chuncked(data_dir: str):
         if i > 13:
             break
     print("\n"*2)
-    dataloader = ChunkedDataLoader(dataset, batch_size=2, batch_start=0)
+    dataset.setup_distributed(global_parallel_rank=1, num_devices=2)
+    dataloader = ChunkedDataLoader(dataset, batch_size=1, batch_start=0)
     for i, data in enumerate(dataloader):
         print(i, tokenizer.decode(data[0][:-1]))
         print("")
