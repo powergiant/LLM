@@ -84,8 +84,13 @@ class ChunkedDataset(IterableDataset):
                                     conf.buffer_size)
         self.global_parallel_rank = global_parallel_rank
         self.num_devices = num_devices
-        
-
+    
+    def setup_distributed(self, global_parallel_rank: int, num_devices: int):
+        check_is_rank_devices_legal(global_parallel_rank,
+                                    num_devices, 
+                                    self.buffer_size)
+        self.global_parallel_rank = global_parallel_rank
+        self.num_devices = num_devices
     
     def __next__(self):
         

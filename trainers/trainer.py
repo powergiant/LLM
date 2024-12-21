@@ -109,6 +109,7 @@ class QwenTrainer:
 
         # Check save path, if not exists, create one
         
+        self.dataset.setup_distributed(fabric.global_rank, self.num_devices)
 
         fabric.seed_everything(3407)
 
