@@ -95,7 +95,7 @@ class ChunkedDataset(IterableDataset):
     def __next__(self):
         
         # If buffer is empty, add more sentences and then tokenize them
-        if self.buffer == []:
+        if len(self.buffer) < self.num_devices:
             self.sentence_buffer = []
             for _ in range(self.buffer_size):
                 self.sentence_buffer.append(next(self.iter)) 

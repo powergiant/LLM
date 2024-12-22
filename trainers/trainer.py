@@ -136,7 +136,7 @@ class QwenTrainer:
 
             attention_mask, position_ids = generate_att_mask_pos_ids(input_ids, self.dataset.tokenizer.pad_token_id)
 
-            is_accumulating = (self.iter_current + 1)%self.gradient_accumulation_steps == 0
+            is_accumulating = (self.iter_current + 1)%self.gradient_accumulation_steps != 0
 
             cross_entropy = QwenCrossEntropyLoss(ignore_index=self.dataset.tokenizer.pad_token_id)
 
@@ -145,6 +145,7 @@ class QwenTrainer:
                 output_logits = model.forward(input_ids, attention_mask, position_ids)
                 with fabric.autocast():
                     loss = cross_entropy(output_logits, target_ids)
+                print(f"batch: {self.iter_current}, loss: {loss}")
                 fabric.backward(loss/self.gradient_accumulation_steps)
 
             if not is_accumulating:
