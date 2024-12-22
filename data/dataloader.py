@@ -6,7 +6,7 @@ import itertools
 import torch
 from torch.utils.data import DataLoader
 from transformers import PreTrainedTokenizer
-from multiprocessing import Pool
+from multiprocessing import get_context, Pool
 from functools import partial
 
 @dataclass
@@ -99,7 +99,7 @@ class ChunkedDataset(IterableDataset):
             self.sentence_buffer = []
             for _ in range(self.buffer_size):
                 self.sentence_buffer.append(next(self.iter)) 
-            with Pool(processes=self.num_worker) as pool:
+            with get_context("spawn").Pool(processes=self.num_worker) as pool:
                 tokenize_and_chunk_partial: function = \
                     partial(tokenize_and_chunk, 
                             tokenizer=self.tokenizer,
@@ -122,8 +122,8 @@ class ChunkedDataset(IterableDataset):
 def check_is_rank_devices_legal(global_parallel_rank: int,
                                 num_devices: int,
                                 buffer_size: int):
-    if buffer_size%num_devices != 0:
-        raise f"buffer_size must be divisible by num_devices"
+    if buffer_size < num_devices:
+        raise f"buffer_size must be greater or equal to num_devices"
     if global_parallel_rank >= num_devices:
         raise f"global_parallel_rank must be less than num_devices"
 
