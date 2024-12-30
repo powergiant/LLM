@@ -191,7 +191,7 @@ def _test_trainer():
     from transformers import Qwen2ForCausalLM as Qwen2ForCausalLMOld
     from models.modeling_qwen import Qwen2Config
 
-    model_old: Qwen2ForCausalLMOld = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-1.5B", attn_implementation = "eager")
+    model_old: Qwen2ForCausalLMOld = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-1.5B", attn_implementation = "sdpa")
     conf = Qwen2Config(hidden_size=1536,
                        pad_token_id=None,
                        vocab_size=151936,
@@ -199,6 +199,7 @@ def _test_trainer():
                        rms_norm_eps=1e-06,
                        intermediate_size=8960,
                        hidden_act="silu",
+                       attn_implementation='sdpa',
                        num_attention_heads=12,
                        num_key_value_heads=2,
                        max_position_embeddings=131072,
