@@ -362,9 +362,9 @@ class Qwen2DecoderLayer(nn.Module):
 
         hidden_states = self.input_layernorm(hidden_states)
 
-        if torch.is_autocast_enabled():
-            target_dtype = torch.get_autocast_gpu_dtype()
-        hidden_states = hidden_states.to(target_dtype)
+        # if torch.is_autocast_enabled():
+        #     target_dtype = torch.get_autocast_gpu_dtype()
+        # hidden_states = hidden_states.to(target_dtype)
 
         # Self Attention
         hidden_states = self.self_attn(
@@ -456,9 +456,9 @@ class Qwen2Model(nn.Module):
     ) -> Tensor:
         inputs_embeds = self.embed_tokens(input_ids)
 
-        if torch.is_autocast_enabled():
-            target_dtype = torch.get_autocast_gpu_dtype()
-        inputs_embeds = self.embed_tokens(input_ids).to(target_dtype)
+        # if torch.is_autocast_enabled():
+        #     target_dtype = torch.get_autocast_gpu_dtype()
+        # inputs_embeds = self.embed_tokens(input_ids).to(target_dtype)
 
         causal_mask = self._update_causal_mask(
             attention_mask, inputs_embeds
