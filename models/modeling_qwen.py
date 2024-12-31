@@ -200,8 +200,8 @@ class Qwen2Attention(nn.Module):
     def forward(
         self,
         hidden_states: Tensor,
-        position_embeddings: Tuple[Tensor, Tensor],
         attention_mask: Tensor,
+        position_embeddings: Tuple[Tensor, Tensor]
     ) -> Tensor:
         bsz, q_len, _ = hidden_states.size()
 
@@ -253,8 +253,8 @@ class Qwen2SdpaAttention(Qwen2Attention):
     def forward(
         self,
         hidden_states: Tensor,
-        position_embeddings: Tuple[Tensor, Tensor],
-        attention_mask: Tensor
+        attention_mask: Tensor,
+        position_embeddings: Tuple[Tensor, Tensor]
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
 
         bsz, q_len, _ = hidden_states.size()
@@ -346,7 +346,7 @@ class Qwen2DecoderLayer(nn.Module):
         self,
         hidden_states: Tensor,
         attention_mask: Tensor,
-        position_embeddings: Optional[Tuple[Tensor, Tensor]] = None,  # will become mandatory in v4.46
+        position_embeddings: Tuple[Tensor, Tensor],  # will become mandatory in v4.46
     ) -> Tensor:
         """
         Args:
