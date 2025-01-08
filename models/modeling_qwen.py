@@ -661,7 +661,7 @@ def _test():
     print("\n"*2)
     print('='*30 + 'test_my_modeling_equals_to_old' + '='*30)
     # assert torch.equal(logits, logits_old)
-    torch.allclose(logits, logits_old, rtol=0.0, atol=1e-04)
+    assert torch.allclose(logits, logits_old, rtol=0.0, atol=1e-04)
 
     print("\n"*2)
     print('='*30 + 'test_my_cross_entropy_loss' + '='*30)
